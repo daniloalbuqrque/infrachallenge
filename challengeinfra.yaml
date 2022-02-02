@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: challengeinfrateam
+spec:
+  selector:
+    matchLabels:
+      app: challengeinfra
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: challengeinfra
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: NotIn
+                    values: ["true"]
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:  [challengeinfra]
+              topologyKey: kubernetes.io/hostname 
+      containers:
+        - image: docker.io/roggoncalves/rotational-goapp:v1.0
+          name: challengeinfra
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 25
+          readinessProbe:
+            exec:
+              command:
+              - cat
+              - /tmp/healthy
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 3000
+          lifecycle:
+            preStop:
+              exec:
+                command: ["kill", "1"]
+      terminationGracePeriodSeconds: 1800
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+      # expose command: kubectl expose deployment [app] --type=LoadBalancer --name=my-service
+      # get service: kubectl get services my-service
